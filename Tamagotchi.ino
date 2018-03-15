@@ -15,7 +15,6 @@
 //define analog pins
 #define PTA 0
 #define PTB 1
-#define PTC 2
 #define LCA 4
 #define LCB 5
 
@@ -37,8 +36,8 @@ String stat_names[] = {"HEALTH", "HAPPINESS", "FULLNESS", "WEIGHT", "AGE"};
 int change[] = {0, -2, -2, -1, 10};
 
 String activities[] = {"FOODS", "GAMES"};
-String foods[] = {"BURGER", "CARROTS"};
-int f_increase[][4] = {{0, 300, 500, 300}, {100, -100, 300, 50}};
+String foods[] = {"BURGER", "CARROTS", "MEDICINE"};
+int f_increase[][4] = {{0, 300, 500, 300}, {100, -100, 300, 50}, {50, -200, 50, 0}};
 String games[] = {"SPORTS", "COMPUTER"};
 int g_increase[][4] = {{100, 300, -250, -300}, {0, 300, 0, 300}};
 
@@ -47,6 +46,7 @@ long age = 0;
 
 int potvars[3];
 int counter = 0;
+int sick_counter = 9;
 int bar = 0;
 int current_stat = 10;
 int current_selected = 10;
@@ -66,10 +66,13 @@ boolean update_stats = false;
 boolean f_active = false;
 boolean g_active = false;
 boolean was_alive = false;
-boolean bad[3];
+boolean bad[3] = {false, false, false};
+boolean cure = false;
+boolean update_lcd = false;
 
 unsigned long current_time;
 unsigned long last_time = 0;
+unsigned long sick_cooldown = 0;
 
 
 
@@ -93,9 +96,12 @@ void setup() {
   //set starting text to lcd
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Welcome");
+  lcd.print("WELCOME TO MY");
   lcd.setCursor(0, 1);
-  lcd.print("Bitches");
+  lcd.print("TAMAGOTCHI");
+
+  //set sick_cooldown first time
+  sick_cooldown = millis();
 }
 
 
@@ -121,7 +127,7 @@ void loop() {
         if (potvars[0] < 200) {
           int stat = 0;
           colorWipe(strip.Color(255, 0, 0), 10, stat); // Red
-          if (stat != current_stat) {
+          if (stat != current_stat || update_lcd) {
             current_selected = 4;
             lcd.clear();
             lcd.setCursor(0, 0);
@@ -132,7 +138,7 @@ void loop() {
         } else if (potvars[0] < 400) {
           int stat = 1;
           colorWipe(strip.Color(0, 255, 0), 10, stat); // Green
-          if (stat != current_stat) {
+          if (stat != current_stat || update_lcd) {
             current_selected = 4;
             lcd.clear();
             lcd.setCursor(0, 0);
@@ -143,7 +149,7 @@ void loop() {
         } else if (potvars[0] < 600) {
           int stat = 2;
           colorWipe(strip.Color(0, 0, 255), 10, stat); // Blue
-          if (stat != current_stat) {
+          if (stat != current_stat || update_lcd) {
             current_selected = 4;
             lcd.clear();
             lcd.setCursor(0, 0);
@@ -154,7 +160,7 @@ void loop() {
         } else if (potvars[0] < 800) {
           int stat = 3;
           colorWipe(strip.Color(255, 255, 0), 10, stat); // Yellow
-          if (stat != current_stat) {
+          if (stat != current_stat || update_lcd) {
             current_selected = 4;
             lcd.clear();
             lcd.setCursor(0, 0);
@@ -165,7 +171,7 @@ void loop() {
         } else {
           int stat = 4;
           colorWipe(strip.Color(233, 0, 255), 10, stat); // Purple
-          if (stat != current_stat) {
+          if (stat != current_stat || update_lcd) {
             current_selected = 4;
             lcd.clear();
             lcd.setCursor(0, 0);
@@ -179,15 +185,27 @@ void loop() {
         } else if (potvars[1] > 500) {
           selector = 1;
         }
+        if ((selector == 0 && potvars[1] > 333) || (selector == 1 && potvars[1] < 666)) {
+          if (sick) {
+            cure = true;
+          }
+        }
         if (f_active) {
-          if (selector != current_selected) {
+          if (cure) {
+            lcd.setCursor(0, 1);
+            lcd.print(foods[2]);
+            current_selected = 2;
+          } else if (selector != current_selected || update_lcd) {
+            update_lcd = true;
             lcd.setCursor(0, 1);
             lcd.print(foods[selector]);
             current_selected = selector;
           }
+          cure=false;
           //Serial.println("CARROTS");
         } else if (g_active) {
           if (selector != current_selected) {
+            update_lcd = true;
             lcd.setCursor(0, 1);
             lcd.print(games[selector]);
             current_selected = selector;
@@ -195,11 +213,22 @@ void loop() {
           //Serial.println("COMPUTER");
         } else {
           if (selector != current_selected) {
+            update_lcd = true;
             lcd.setCursor(0, 1);
             lcd.print(activities[selector]);
             current_selected = selector;
           }
           //Serial.println("FOOD");
+        }
+        if (sick) {
+          sick_counter++;
+          if (sick_counter == 10) {
+            uint32_t sick_color = strip.Color(14, 237, 0);
+            if (current_stat == 0) {
+              colorChase(sick_color, strip.Color(255, 0, 0), 0);
+            }
+            sick_counter = 0;
+          }
         }
       }
     } else {
@@ -210,6 +239,7 @@ void loop() {
     }
     if (update_stats) {
       updateStats();
+      checkSickness();
       update_stats = false;
     }
   } else {
@@ -231,13 +261,13 @@ void loop() {
       Serial.println("Hunger: " + (String)stats[2]);
       Serial.println("Weight: " + (String)stats[3]);
       Serial.println("Age: " + (String)age);
+      Serial.println("Sick: " + (String)sick);
       Serial.println("");
     }
     was_alive = false;
   }
   buttonPressed();
   update_screens = false;
-  checkSickness();
   finalChecks();
 }
 
@@ -260,6 +290,31 @@ void colorWipe(uint32_t c, int wait, int type) {
   }
 }
 
+
+void colorChase(uint32_t c1, uint32_t c2, int type) {
+  int y = round(12 * percentages[type]);
+  //Serial.println(y);
+  for (int i = 0; i < 13; i++) {
+    if (i == 0) {
+      strip.setPixelColor(i, c1);
+    } if (i == 12) {
+      if (i <= y) {
+        strip.setPixelColor((i - 1), c2);
+      } else {
+        strip.setPixelColor((i - 1), 0, 0, 0);
+      }
+    } else {
+      strip.setPixelColor(i, c1);
+      if (i <= y) {
+        strip.setPixelColor((i - 1), c2);
+      } else {
+        strip.setPixelColor((i - 1), 0, 0, 0);
+      }
+    }
+    strip.show();
+    delay(20);
+  }
+}
 
 
 //gets thet percentages of all the health bars
@@ -297,7 +352,7 @@ void buttonPressed() {
     if (button_check_a) {
       if (dead) {
         dead = false;
-        stats[0] = 500;
+        stats[0] = 800;
         stats[1] = 500;
         stats[2] = 300;
         stats[3] = 500;
@@ -351,6 +406,13 @@ void buttonPressed() {
               stats[2] += f_increase[1][2];
               stats[3] += f_increase[1][3];
             }
+            if (current_selected == 2) {
+              stats[0] = stats[0] + f_increase[1][0];
+              stats[1] += f_increase[1][1];
+              stats[2] += f_increase[1][2];
+              stats[3] += f_increase[1][3];
+              sick = false;
+            }
             f_active = false;
           } else if (g_active) {
             if (current_selected == 0) {
@@ -403,7 +465,11 @@ void buttonPressed() {
 
 void updateStats() {
   for (int i = 0; i < 4; i++) {
-    stats[i] += change[i];
+    if (sick) {
+      stats[i] += (change[i] * 2);
+    } else {
+      stats[i] += change[i];
+    }
   }
   age += change[4];
   for (int i = 0; i < 3; i++) {
@@ -411,21 +477,43 @@ void updateStats() {
       stats[0] -= 2;
     }
   }
-  if (!bad[0] && !bad[1] && !bad[2]) {
+  if ((!bad[0] && !bad[1] && !bad[2]) && !sick) {
     stats[0] += 5;
   }
-
-  Serial.println("Health: " + (String)stats[0]);
-  Serial.println("Happiness: " + (String)stats[1]);
-  Serial.println("Hunger: " + (String)stats[2]);
-  Serial.println("Weight: " + (String)stats[3]);
-  Serial.println("Age: " + (String)age);
-  Serial.println("");
+  if (debug) {
+    Serial.println("Health: " + (String)stats[0]);
+    Serial.println("Happiness: " + (String)stats[1]);
+    Serial.println("Hunger: " + (String)stats[2]);
+    Serial.println("Weight: " + (String)stats[3]);
+    Serial.println("Age: " + (String)age);
+    Serial.println("Sick: " + (String)sick);
+    Serial.println("");
+  }
 }
 
 
 void checkSickness() {
-
+  unsigned long tmp = (current_time - sick_cooldown);
+  long cd = 3600000;
+  Serial.println(tmp);
+  if (tmp > cd) {
+    int chance = 10;
+    if (!sick) {
+      for (int i = 0; i < 3; i++) {
+        if (bad[i]) {
+          chance += 10;
+        }
+      }
+      int random_chance = random(0, 100);
+      if (random_chance < chance) {
+        sick = true;
+        Serial.println("GOTTEN SICK");
+        sick_cooldown = millis();
+      } else {
+        Serial.println("NOT GOTTEN SICK");
+      }
+    }
+  }
 }
 
 
@@ -456,6 +544,8 @@ void finalChecks() {
         } else {
           bad[0] = true;
         }
+      } else {
+        bad[0] = false;
       }
       if (stats[1] < 300) {
         if (stats[0] == 0) {
@@ -464,6 +554,8 @@ void finalChecks() {
         } else {
           bad[1] = true;
         }
+      } else {
+        bad[1] = false;
       }
       if (stats[2] < 200) {
         if (stats[2] == 0) {
@@ -472,6 +564,8 @@ void finalChecks() {
         } else {
           bad[2] = true;
         }
+      } else {
+        bad[2] = false;
       }
     }
   }
