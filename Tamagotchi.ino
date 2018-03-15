@@ -131,7 +131,7 @@ void loop() {
             current_selected = 4;
             lcd.clear();
             lcd.setCursor(0, 0);
-            lcd.print(stat_names[stat]);
+            lcd.print("Stat: " + stat_names[stat]);
             current_stat = stat;
           }
           //Serial.println("RED");
@@ -142,7 +142,7 @@ void loop() {
             current_selected = 4;
             lcd.clear();
             lcd.setCursor(0, 0);
-            lcd.print(stat_names[stat]);
+            lcd.print("Stat: " + stat_names[stat]);
             current_stat = stat;
           }
           //Serial.println("GREEN");
@@ -153,7 +153,7 @@ void loop() {
             current_selected = 4;
             lcd.clear();
             lcd.setCursor(0, 0);
-            lcd.print(stat_names[stat]);
+            lcd.print("Stat: " + stat_names[stat]);
             current_stat = stat;
           }
           //Serial.println("BLUE");
@@ -164,7 +164,7 @@ void loop() {
             current_selected = 4;
             lcd.clear();
             lcd.setCursor(0, 0);
-            lcd.print(stat_names[stat]);
+            lcd.print("Stat: " + stat_names[stat]);
             current_stat = stat;
           }
           //Serial.println("YELLOW");
