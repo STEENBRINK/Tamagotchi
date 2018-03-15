@@ -356,6 +356,9 @@ void buttonPressed() {
         stats[1] = 500;
         stats[2] = 300;
         stats[3] = 500;
+        f_active = false;
+        g_active = false;
+        sick = false;
         age = 0;
       } else {
         //Serial.println("Turning Screens Off/On");
